@@ -15,7 +15,51 @@ const db = new sqlite3.Database('./db/election.db', err => {
     }
     console.log('Connected to the election database.');
   });
-
+//Get all parties
+app.get('/api/parties', (req, res) => {
+    const sql = `SELECT * FROM parties`;
+    const params = [];
+    db.all(sql, params, (err, rows) => {
+      if (err) {
+        res.status(500).json({ error: err.message });
+        return;
+      }
+  
+      res.json({
+        message: 'success',
+        data: rows
+      });
+    });
+  });
+// Get single party
+app.get('/api/party/:id', (req, res) => {
+    const sql = `SELECT * FROM parties WHERE id = ?`;
+    const params = [req.params.id];
+    db.get(sql, params, (err, row) => {
+      if (err) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
+  
+      res.json({
+        message: 'success',
+        data: row
+      });
+    });
+  });
+// Delete a party
+  // Need to use normal function syntax for the db.run() callback instead of an arrow function, or else we'd lose the context of this.changes.
+app.delete('/api/party/:id', (req, res) => {
+    const sql = `DELETE FROM parties WHERE id = ?`;
+    const params = [req.params.id];
+    db.run(sql, params, function(err, result) {
+      if (err) {
+        res.status(400).json({ error: res.message });
+        return;
+      }
+      res.json({ message: 'successfully deleted', changes: this.changes });
+    });
+  });
 // Get single candidate
 app.get('/api/candidate/:id', (req, res) => {
     const sql = `SELECT candidates.*, parties.name 
@@ -94,6 +138,29 @@ app.get('/api/candidates', (req, res) => {
       });
     });
   });
+  // Update a candidate
+  app.put('/api/candidate/:id', (req, res) => {
+    // Force any PUT request to include party_id property.
+    const errors = inputCheck(req.body, 'party_id');
+    if (errors) {
+      res.status(400).json({ error: errors });
+      return;
+    }
+    const sql = `UPDATE candidates SET party_id = ? 
+                 WHERE id = ?`;
+    const params = [req.body.party_id, req.params.id];
+    db.run(sql, params, function(err, result) {
+      if (err) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
+      res.json({
+        message: 'success',
+        data: req.body,
+        changes: this.changes
+      });
+    });
+  });  
 // Default response for any other request(Not Found) Catch all
 app.use((req, res) => {
     res.status(404).end();
